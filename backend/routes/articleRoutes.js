@@ -46,6 +46,7 @@ router.get(
 // Increment article views
 router.patch(
   '/:id/view',
+  optionalAuth,
   incrementViews
 );
 

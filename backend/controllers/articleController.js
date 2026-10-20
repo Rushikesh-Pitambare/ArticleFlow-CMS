@@ -683,13 +683,39 @@ const likeArticle = async (req, res) => {
 
 
 // Increment article views
+
 const incrementViews = async (req, res) => {
   try {
-    const article = await Article.findByIdAndUpdate(
-      req.params.id,
-      { $inc: { views: 1 } },
-      { new: true }
-    );
+    const articleId = req.params.id;
+    let article = null;
+
+    // 1. Try MongoDB first when connected
+    if (
+      mongoose.connection &&
+      mongoose.connection.readyState === 1 &&
+      mongoose.Types.ObjectId.isValid(articleId)
+    ) {
+      article = await Article.findByIdAndUpdate(
+        articleId,
+        { $inc: { views: 1 } },
+        { new: true }
+      );
+    }
+
+    // 2. Fall back to in-memory articles
+    if (!article) {
+      const articleStore = require('../models/articleStore');
+
+      article = (articleStore.inMemoryArticles || []).find(
+        (item) =>
+          String(item._id || item.id) === String(articleId)
+      );
+
+      if (article) {
+        article.views = (article.views || 0) + 1;
+        article.updatedAt = new Date();
+      }
+    }
 
     if (!article) {
       return res.status(404).json({
@@ -698,19 +724,78 @@ const incrementViews = async (req, res) => {
       });
     }
 
-    res.status(200).json({
+    // 3. Record reading history for authenticated users only
+    if (req.user) {
+      try {
+        const user = req.user;
+
+        if (!Array.isArray(user.readingHistory)) {
+          user.readingHistory = [];
+        }
+
+        const history = user.readingHistory;
+        const existingIndex = history.findIndex(
+          (item) => String(item.articleId) === String(articleId)
+        );
+
+        const category = article.category || '';
+        const tags = Array.isArray(article.tags)
+          ? article.tags
+          : [];
+
+        if (existingIndex !== -1) {
+          // Update the existing entry instead of creating a duplicate
+          history[existingIndex].category = category;
+          history[existingIndex].tags = tags;
+          history[existingIndex].viewedAt = new Date();
+          history[existingIndex].viewCount =
+            (history[existingIndex].viewCount || 1) + 1;
+
+          // Move the recently viewed article to the end
+          const [entry] = history.splice(existingIndex, 1);
+          history.push(entry);
+        } else {
+          history.push({
+            articleId: String(articleId),
+            category,
+            tags,
+            viewedAt: new Date(),
+            viewCount: 1,
+          });
+        }
+
+        // Keep only the 50 most recently viewed articles
+        if (history.length > 50) {
+          user.readingHistory = history.slice(-50);
+        }
+
+        // MongoDB documents and the in-memory fallback both support save()
+        if (typeof user.save === 'function') {
+          await user.save();
+        }
+      } catch (historyError) {
+        // A history failure must not prevent the view-count response
+        console.warn(
+          'Could not save reading history:',
+          historyError.message
+        );
+      }
+    }
+
+    return res.status(200).json({
       success: true,
       views: article.views,
     });
   } catch (error) {
     console.error('Increment views error:', error);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to increment views.',
     });
   }
 };
+
 
 // Delete article
 const deleteArticle = async (req, res) => {
@@ -880,68 +965,211 @@ const getAllArticlesForAdmin = async (req, res) => {
 };
 
 // Get recommended articles related by category or tags
+
 const getRecommendedArticles = async (req, res) => {
   try {
     const { id } = req.params;
+    const connected = isMongoConnected();
 
-    if (mongoose.connection && mongoose.connection.readyState === 1 && mongoose.Types.ObjectId.isValid(id)) {
-      const currentArticle = await Article.findById(id);
+    let currentArticle = null;
+    let candidates = [];
+
+    // 1. Fetch the current article and published candidates
+    if (connected && mongoose.Types.ObjectId.isValid(id)) {
+      currentArticle = await Article.findById(id);
+
       if (!currentArticle) {
-        return res.status(404).json({ success: false, message: 'Article not found.' });
+        return res.status(404).json({
+          success: false,
+          message: 'Article not found.',
+        });
       }
 
-      const recommendations = await Article.find({
-        _id: { $ne: id },
+      candidates = await Article.find({
+        _id: { $ne: currentArticle._id },
         status: 'published',
-        $or: [
-          { category: currentArticle.category },
-          { tags: { $in: currentArticle.tags || [] } }
-        ],
-      })
-        .populate('author', 'name email role avatar')
-        .limit(4);
+      }).populate('author', 'name email role avatar');
+    } else {
+      const articleStore = require('../models/articleStore');
+      const allArticles = articleStore.inMemoryArticles || [];
 
-      if (recommendations.length < 4) {
-        const existingIds = recommendations.map(r => r._id).concat(id);
-        const fill = await Article.find({
-          _id: { $nin: existingIds },
-          status: 'published',
-        })
-          .populate('author', 'name email role avatar')
-          .limit(4 - recommendations.length);
+      currentArticle = allArticles.find(
+        (article) => String(article._id || article.id) === String(id)
+      );
 
-        recommendations.push(...fill);
+      if (!currentArticle) {
+        return res.status(404).json({
+          success: false,
+          message: 'Article not found.',
+        });
       }
 
-      return res.status(200).json({
-        success: true,
-        count: recommendations.length,
-        recommendations,
+      candidates = allArticles.filter(
+        (article) =>
+          String(article._id || article.id) !== String(id) &&
+          article.status === 'published'
+      );
+    }
+
+    // 2. Read the logged-in user's reading history
+    const history = Array.isArray(req.user?.readingHistory)
+      ? req.user.readingHistory
+      : [];
+
+    const viewedIds = new Set(
+      history.map((entry) => String(entry.articleId))
+    );
+
+    // 3. Build category and tag preferences from reading history
+    const categoryScores = new Map();
+    const tagScores = new Map();
+
+    const normalize = (value) =>
+      String(value || '').trim().toLowerCase();
+
+    history.forEach((entry) => {
+      const weight = Math.min(
+        Math.max(Number(entry.viewCount) || 1, 1),
+        5
+      );
+
+      const category = normalize(entry.category);
+      if (category) {
+        categoryScores.set(
+          category,
+          (categoryScores.get(category) || 0) + weight
+        );
+      }
+
+      (Array.isArray(entry.tags) ? entry.tags : []).forEach((tag) => {
+        const normalizedTag = normalize(tag);
+        if (normalizedTag) {
+          tagScores.set(
+            normalizedTag,
+            (tagScores.get(normalizedTag) || 0) + weight
+          );
+        }
       });
-    }
+    });
 
-    const articleStore = require('../models/articleStore');
-    const all = (articleStore.inMemoryArticles || []).filter(a => a.status === 'published');
-    const current = (articleStore.inMemoryArticles || []).find(a => a._id === id || a.id === id);
-    let list = all.filter(a => (a._id !== id && a.id !== id));
-    if (current?.category) {
-      const matchCat = list.filter(a => a.category === current.category);
-      if (matchCat.length > 0) list = matchCat;
-    }
+    // 4. Include the current article's category and tags as additional signals
+    const currentCategory = normalize(currentArticle.category);
+    const currentTags = (Array.isArray(currentArticle.tags)
+      ? currentArticle.tags
+      : []
+    ).map(normalize).filter(Boolean);
 
-    res.status(200).json({
+    const ranked = candidates.map((candidate) => {
+      const category = normalize(candidate.category);
+      const tags = (Array.isArray(candidate.tags) ? candidate.tags : [])
+        .map(normalize)
+        .filter(Boolean);
+
+      let score = 0;
+      const reasons = [];
+
+      // Preference learned from the user's previous reading
+      if (category && categoryScores.has(category)) {
+        score += categoryScores.get(category) * 3;
+        reasons.push(`your interest in ${candidate.category}`);
+      }
+
+      const matchingHistoryTags = tags.filter((tag) =>
+        tagScores.has(tag)
+      );
+
+      matchingHistoryTags.forEach((tag) => {
+        score += tagScores.get(tag) * 2;
+      });
+
+      if (matchingHistoryTags.length > 0) {
+        reasons.push(
+          `topics you've explored: ${matchingHistoryTags.slice(0, 3).join(', ')}`
+        );
+      }
+
+      // Similarity to the article currently being read
+      if (category && category === currentCategory) {
+        score += 2;
+
+        if (!reasons.some((reason) => reason.includes(candidate.category))) {
+          reasons.push(`the ${candidate.category} category`);
+        }
+      }
+
+      const matchingCurrentTags = tags.filter((tag) =>
+        currentTags.includes(tag)
+      );
+
+      if (matchingCurrentTags.length > 0) {
+        score += matchingCurrentTags.length;
+
+        if (matchingHistoryTags.length === 0) {
+          reasons.push(
+            `similar topics: ${matchingCurrentTags.slice(0, 3).join(', ')}`
+          );
+        }
+      }
+
+      const plainArticle =
+        typeof candidate.toObject === 'function'
+          ? candidate.toObject()
+          : { ...candidate };
+
+      return {
+        ...plainArticle,
+        _recommendationScore: score,
+        recommendationReason:
+          reasons.length > 0
+            ? `Recommended because of ${reasons.join(' and ')}.`
+            : 'Suggested for you to explore.',
+        _wasViewed: viewedIds.has(
+          String(candidate._id || candidate.id)
+        ),
+      };
+    });
+
+    // 5. Rank by relevance; prefer unread articles when possible
+    ranked.sort((a, b) => {
+      if (a._wasViewed !== b._wasViewed) {
+        return Number(a._wasViewed) - Number(b._wasViewed);
+      }
+
+      if (b._recommendationScore !== a._recommendationScore) {
+        return b._recommendationScore - a._recommendationScore;
+      }
+
+      const dateA = new Date(a.publishedAt || a.createdAt || 0).getTime();
+      const dateB = new Date(b.publishedAt || b.createdAt || 0).getTime();
+
+      return dateB - dateA;
+    });
+
+    const recommendations = ranked.slice(0, 4).map((article) => {
+      const {
+        _recommendationScore,
+        _wasViewed,
+        ...publicArticle
+      } = article;
+
+      return publicArticle;
+    });
+
+    return res.status(200).json({
       success: true,
-      count: list.slice(0, 4).length,
-      recommendations: list.slice(0, 4),
+      count: recommendations.length,
+      recommendations,
     });
   } catch (error) {
     console.error('Get recommended articles error:', error);
-    res.status(500).json({
+
+    return res.status(500).json({
       success: false,
       message: 'Failed to fetch recommendations.',
     });
   }
 };
+
 
 module.exports = {
   createArticle,

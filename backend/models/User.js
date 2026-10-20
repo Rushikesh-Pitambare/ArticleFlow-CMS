@@ -44,6 +44,35 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    // Personalized Recommendations: Reader article history
+readingHistory: {
+  type: [
+    {
+      articleId: {
+        type: String,
+        required: true,
+      },
+      category: {
+        type: String,
+        default: '',
+      },
+      tags: {
+        type: [String],
+        default: [],
+      },
+      viewedAt: {
+        type: Date,
+        default: Date.now,
+      },
+      viewCount: {
+        type: Number,
+        default: 1,
+        min: 1,
+      },
+    },
+  ],
+  default: [],
+},
     // Phase 3: User Trust & Reputation metrics (Sadanand Module)
     trustScore: {
       type: Number,

@@ -567,11 +567,24 @@ const ArticleDetails = () => {
           .catch(() => {});
 
         // Fetch Recommendations
+
+        // Fetch Recommendations
         try {
-          const apiBase = import.meta.env.VITE_API_URL || 'https://content-management-system-2-he9n.onrender.com/api';
+          const apiBase =
+            import.meta.env.VITE_API_URL ||
+            'https://content-management-system-2-he9n.onrender.com/api';
+
+          const token = localStorage.getItem('lumen_token');
+
           const recRes = await fetch(
-            `${apiBase}/articles/${id}/recommendations`
+            `${apiBase}/articles/${id}/recommendations`,
+            {
+              headers: token
+                ? { Authorization: `Bearer ${token}` }
+                : {},
+            }
           );
+
 
           const recData = await recRes.json();
 
@@ -814,7 +827,7 @@ const ArticleDetails = () => {
     );
 
   return (
-  
+
     <div className="relative min-h-screen pb-16">
 
       {/* Fixed Scroll Reading Progress Bar */}
@@ -1335,7 +1348,7 @@ const ArticleDetails = () => {
       {showReportForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md bg-white rounded-2xl p-6 shadow-xl">
-      
+
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-xl font-serif font-bold text-stone-900">
                 Report Article
