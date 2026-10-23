@@ -391,6 +391,59 @@ export const spamAbuseAPI = {
   getPendingReports: () => API.get('/spam-abuse/reports/pending'),
 };
 
+// ======================================================
+// Author Analytics & Freshness Alerts API
+// ======================================================
+
+const unwrap = (request) =>
+  request
+    .then((res) => res.data)
+    .catch((error) => {
+      throw new Error(error.response?.data?.message || error.message);
+    });
+
+const withAuthor = (authorId) => (authorId ? { authorId } : {});
+
+export const analyticsAPI = {
+  getOverview: (authorId) =>
+    unwrap(API.get('/analytics/overview', { params: withAuthor(authorId) })),
+
+  getTopArticles: (limit = 10, authorId) =>
+    unwrap(API.get('/analytics/top-articles', { params: { limit, ...withAuthor(authorId) } })),
+
+  getPopularTopics: (authorId) =>
+    unwrap(API.get('/analytics/popular-topics', { params: withAuthor(authorId) })),
+
+  getFreshnessAlerts: (filter = 'all', authorId) =>
+    unwrap(API.get('/analytics/freshness/alerts', { params: { filter, ...withAuthor(authorId) } })),
+
+  markArticleReviewed: (articleId) =>
+    unwrap(API.post(`/analytics/freshness/review/${articleId}`)),
+
+  getArticles: (params = {}) =>
+    unwrap(API.get('/analytics/articles', { params })),
+
+  auditArticleLinks: (articleId) =>
+    unwrap(API.post(`/analytics/links/audit/${articleId}`)).then((res) => ({
+      ...res,
+      linksAudit: res.audit,
+    })),
+
+  // Checks links of the articles in scope one at a time (first 25 articles only).
+  bulkAuditLinks: async (authorId) => {
+    const list = await analyticsAPI.getArticles(withAuthor(authorId));
+    const targets = (list.articles || []).slice(0, 25);
+    let brokenLinksFound = 0;
+
+    for (const article of targets) {
+      const res = await analyticsAPI.auditArticleLinks(article.id);
+      brokenLinksFound += res.audit.brokenLinksCount;
+    }
+
+    return { success: true, articlesScanned: targets.length, brokenLinksFound };
+  },
+};
+
 // Alias QuizAPI for backwards compatibility
 export const QuizAPI = quizAPI;
 

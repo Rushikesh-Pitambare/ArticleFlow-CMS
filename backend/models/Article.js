@@ -139,6 +139,35 @@ const articleSchema = new mongoose.Schema(
       min: 0,
     },
 
+    // --- Author Analytics & Freshness Alerts ---
+    shares: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    lastReviewedAt: {
+      type: Date,
+      default: null,
+    },
+
+    linksAudit: {
+      lastAuditedAt: { type: Date, default: null },
+      totalLinks: { type: Number, default: 0 },
+      brokenLinksCount: { type: Number, default: 0 },
+      links: [
+        {
+          url: String,
+          text: String,
+          status: Number,
+          statusText: String,
+          isBroken: Boolean,
+          skipped: Boolean,
+          checkedAt: Date,
+        },
+      ],
+    },
+
     readingTime: {
       type: Number,
       default: 1,

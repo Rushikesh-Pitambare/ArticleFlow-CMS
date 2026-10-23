@@ -34,6 +34,7 @@ import DiscussionPage from './pages/DiscussionPage';
 import ChatPage from './pages/ChatPage';
 import QuizBuilder from './pages/QuizBuilder';
 import Appeals from './pages/Appeals';
+import AuthorAnalytics from './pages/AuthorAnalytics';
 
 function App() {
   return (
@@ -94,6 +95,18 @@ function App() {
                 }
               />
 
+
+              {/* Author Analytics & Freshness Alerts */}
+              <Route
+                path="/analytics"
+                element={
+                  <ProtectedRoute>
+                    <RoleRoute allowedRoles={['author', 'admin']}>
+                      <AuthorAnalytics />
+                    </RoleRoute>
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Login */}
               <Route

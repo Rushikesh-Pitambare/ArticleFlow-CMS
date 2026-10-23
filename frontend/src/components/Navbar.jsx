@@ -27,6 +27,7 @@ import {
   ArrowRight,
   Shield,
   Activity,
+  BarChart3,
 } from 'lucide-react';
 
 const Navbar = () => {
@@ -212,6 +213,7 @@ const Navbar = () => {
   const isChatActive = location.pathname.startsWith('/chat');
   const isWriteActive = location.pathname.startsWith('/write');
   const isQuizBuilderActive = location.pathname.startsWith('/quiz-builder');
+  const isAnalyticsActive = location.pathname.startsWith('/analytics');
   const isAdminActive = location.pathname.startsWith('/admin');
   const isProfileActive = location.pathname === '/profile';
 
@@ -263,6 +265,13 @@ const Navbar = () => {
           label: 'Quizzes',
           icon: BookOpen,
           active: isQuizBuilderActive,
+          show: isAuthor || isAdmin,
+        },
+        {
+          to: '/analytics',
+          label: 'Analytics',
+          icon: BarChart3,
+          active: isAnalyticsActive,
           show: isAuthor || isAdmin,
         },
       ],
