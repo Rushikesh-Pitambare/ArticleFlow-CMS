@@ -16,6 +16,8 @@ const initMemoryStore = async () => {
         email: 'admin@lumen.com',
         password: await bcrypt.hash('admin123', salt),
         role: 'admin',
+        trustScore: 75,
+        trustLevel: 'trusted',
         bio: 'Lead Editorial Director & Platform Administrator at Lumen.',
         avatar: '',
         createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
@@ -28,6 +30,8 @@ const initMemoryStore = async () => {
         email: 'author@lumen.com',
         password: await bcrypt.hash('author123', salt),
         role: 'author',
+        trustScore: 65,
+        trustLevel: 'trusted',
         bio: 'Historian of technology. Former editor at Nature. Coffee enthusiast.',
         avatar: '',
         createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
@@ -40,6 +44,8 @@ const initMemoryStore = async () => {
         email: 'priya.mehta@lumen.com',
         password: await bcrypt.hash('author123', salt),
         role: 'author',
+        trustScore: 85,
+        trustLevel: 'exemplary',
         bio: 'Molecular biologist & science communicator covering genetic engineering.',
         avatar: '',
         createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
@@ -52,6 +58,8 @@ const initMemoryStore = async () => {
         email: 'reader@lumen.com',
         password: await bcrypt.hash('reader123', salt),
         role: 'reader',
+        trustScore: 50,
+        trustLevel: 'neutral',
         bio: 'Avid reader and tech quiz enthusiast exploring modern science.',
         avatar: '',
         createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
@@ -111,6 +119,25 @@ const userStore = {
       },
     };
   },
+  
+  async findOne(filter = {}) {
+    if (filter.email) {
+      return await this.findByEmail(filter.email);
+    }
+
+    await initMemoryStore();
+
+    const found = inMemoryUsers.find((user) =>
+      Object.entries(filter).every(([key, value]) => {
+        return String(user[key]) === String(value);
+      })
+    );
+
+    return found
+      ? { ...found, _id: found.id }
+      : null;
+  },
+
 
   async findById(id) {
     if (isDBConnected()) {
@@ -192,6 +219,8 @@ const userStore = {
       role: role || 'reader',
       bio: bio || '',
       avatar: '',
+      trustScore: 50,
+      trustLevel: 'neutral',
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -204,6 +233,11 @@ const userStore = {
       },
     };
   },
+  
+  async create(userData) {
+    return await this.createUser(userData);
+  },
+
 
   async recordArticleRead(userId, article) {
     const articleId = String(article._id || article.id);
@@ -306,6 +340,23 @@ const userStore = {
           if (updateData.bio !== undefined) user.bio = updateData.bio;
           if (updateData.avatar !== undefined) user.avatar = updateData.avatar;
           if (updateData.role !== undefined) user.role = updateData.role;
+
+          if (updateData.trustScore !== undefined) user.trustScore = updateData.trustScore;
+          if (updateData.trustLevel !== undefined) user.trustLevel = updateData.trustLevel;
+          if (updateData.positiveContributionsCount !== undefined) {
+            user.positiveContributionsCount = updateData.positiveContributionsCount;
+          }
+          if (updateData.violationsCount !== undefined) {
+            user.violationsCount = updateData.violationsCount;
+          }
+          if (updateData.lastReputationUpdate !== undefined) {
+            user.lastReputationUpdate = updateData.lastReputationUpdate;
+          }
+          if (updateData.isRestricted !== undefined) user.isRestricted = updateData.isRestricted;
+          if (updateData.restrictionReason !== undefined) {
+            user.restrictionReason = updateData.restrictionReason;
+          }
+
           await user.save();
           return user;
         }
@@ -371,6 +422,51 @@ const userStore = {
     }
     return false;
   },
+  
+  async findByIdAndUpdate(id, updateData) {
+    if (isDBConnected()) {
+      try {
+        const user = await User.findById(id);
+
+        if (user) {
+          Object.assign(user, updateData);
+          await user.save();
+          return user;
+        }
+      } catch (err) {
+        console.warn(
+          '[DB Fallback] Trust score update failed:',
+          err.message
+        );
+        throw err;
+      }
+    }
+
+    await initMemoryStore();
+
+    const index = inMemoryUsers.findIndex(
+      (user) =>
+        String(user.id || user._id) === String(id)
+    );
+
+    if (index === -1) {
+      return null;
+    }
+
+    inMemoryUsers[index] = {
+      ...inMemoryUsers[index],
+      ...updateData,
+      updatedAt: new Date(),
+    };
+
+    return inMemoryUsers[index];
+  },
+  
+  async find() {
+    return await this.getAllUsers();
+  },
+
+
 
   async getAllUsers() {
     if (isDBConnected()) {
@@ -386,5 +482,6 @@ const userStore = {
     return inMemoryUsers;
   },
 };
+
 
 module.exports = userStore;
