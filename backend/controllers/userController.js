@@ -154,6 +154,8 @@ const getAllUsers = async (req, res) => {
     return res.status(200).json({
       success: true,
       count: users.length,
+      
+      
       users: users.map((u) => ({
         id: u.id || u._id,
         _id: u.id || u._id,
@@ -162,7 +164,11 @@ const getAllUsers = async (req, res) => {
         role: u.role,
         bio: u.bio,
         createdAt: u.createdAt,
+        trustScore: typeof u.trustScore === 'number' ? u.trustScore : null,
+        trustLevel: u.trustLevel || 'neutral',
+        isRestricted: u.isRestricted || false,
       })),
+
     });
   } catch (error) {
     console.error('[User getAllUsers Error]:', error);

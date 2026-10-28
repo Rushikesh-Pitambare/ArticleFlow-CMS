@@ -297,7 +297,7 @@ const AIModerationDashboard = () => {
               </span>
             </div>
             <p className="text-sm text-slate-300 mt-1">
-              Automated multi-tier safety scanning: Low risk (0ΓÇô39) auto-publishes, moderate (40ΓÇô69) notifies admin, high (70ΓÇô100) is blocked.
+              Automated multi-tier safety scanning: Low risk (0-39) auto-publishes, moderate (40-69) notifies admin, high (70-100) is blocked.
             </p>
           </div>
         </div>
@@ -334,7 +334,7 @@ const AIModerationDashboard = () => {
       <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-xl text-blue-900 text-xs flex items-start gap-2.5">
         <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
         <div>
-          <span className="font-semibold">How Risk Scores Work:</span> Risk score measures <span className="font-semibold">danger/violations</span>. A score of <span className="font-semibold text-emerald-700">0/100 means 0% Risk (Completely Clean & Safe)</span>, which is why clean articles auto-publish immediately. Higher scores represent higher violation severity (40ΓÇô69 = Moderate, 70ΓÇô100 = High).
+          <span className="font-semibold">How Risk Scores Work:</span> Risk score measures <span className="font-semibold">danger/violations</span>. A score of <span className="font-semibold text-emerald-700">0/100 means 0% Risk (Completely Clean & Safe)</span>, which is why clean articles auto-publish immediately. Higher scores represent higher violation severity (40-69 = Moderate, 70-100 = High).
         </div>
       </div>
 
@@ -371,7 +371,7 @@ const AIModerationDashboard = () => {
         {/* Low Risk */}
         <div className="bg-white p-5 rounded-xl border border-emerald-100 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Low Risk (0ΓÇô39)</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Low Risk (0-39)</span>
             <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
               <ShieldCheck className="w-5 h-5" />
             </div>
@@ -385,7 +385,7 @@ const AIModerationDashboard = () => {
         {/* Moderate Risk */}
         <div className="bg-white p-5 rounded-xl border border-amber-100 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-amber-600">Moderate Risk (40ΓÇô69)</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-amber-600">Moderate Risk (40-69)</span>
             <div className="p-2 rounded-lg bg-amber-50 text-amber-600">
               <AlertTriangle className="w-5 h-5" />
             </div>
@@ -399,7 +399,7 @@ const AIModerationDashboard = () => {
         {/* High Risk */}
         <div className="bg-white p-5 rounded-xl border border-rose-100 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-rose-600">High Risk (70ΓÇô100)</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-rose-600">High Risk (70-100)</span>
             <div className="p-2 rounded-lg bg-rose-50 text-rose-600">
               <ShieldAlert className="w-5 h-5" />
             </div>
@@ -417,9 +417,9 @@ const AIModerationDashboard = () => {
         <div className="flex flex-wrap gap-1.5 p-1 bg-slate-100 rounded-lg">
           {[
             { id: 'all', label: 'All Content' },
-            { id: 'low', label: '≡ƒƒó Low' },
-            { id: 'moderate', label: '≡ƒƒí Moderate' },
-            { id: 'high', label: '≡ƒö┤ High' },
+            { id: 'low', label: '🟢 Low' },
+            { id: 'moderate', label: '🟡 Moderate' },
+            { id: 'high', label: '🔴 High' },
           ].map((tab) => (
             <button
               key={tab.id}

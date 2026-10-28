@@ -283,15 +283,28 @@ const login = async (req, res) => {
       success: true,
       message: 'Signed in successfully.',
       token,
-      user: {
-        id: userId,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        bio: user.bio,
-        avatar: user.avatar,
-        createdAt: user.createdAt,
-      },
+      
+user: {
+  id: userId,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  bio: user.bio,
+  avatar: user.avatar,
+  createdAt: user.createdAt,
+  trustScore: user.trustScore ?? 50,
+  trustLevel:
+    user.trustLevel ||
+    (user.trustScore >= 80
+      ? 'exemplary'
+      : user.trustScore >= 60
+        ? 'trusted'
+        : user.trustScore >= 35
+          ? 'neutral'
+          : 'restricted'),
+  positiveContributionsCount: user.positiveContributionsCount ?? 0,violationsCount: user.violationsCount ?? 0,
+},
+
     });
   } catch (error) {
     console.error('[Auth Login Error]:', error);

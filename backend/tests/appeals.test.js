@@ -21,6 +21,8 @@ const ADMIN_ID = '66c9f1a00000000000000001';
 
 const userToken = jwt.sign({ id: USER_ID }, jwtSecret);
 const adminToken = jwt.sign({ id: ADMIN_ID }, jwtSecret);
+console.log('Test JWT secret loaded:', Boolean(process.env.JWT_SECRET));
+console.log('Test JWT secret matches:', jwtSecret === process.env.JWT_SECRET);
 
 jest.setTimeout(30000);
 
@@ -106,6 +108,8 @@ describe('Appeals API Tests', () => {
           'I believe the content was removed incorrectly and would like an admin to review the decision.',
       });
 
+    console.log('Appeal POST status:', res.statusCode);
+    console.log('Appeal POST response:', res.body);
     expect(res.statusCode).toBe(201);
     expect(res.body.success).toBe(true);
     expect(res.body.appeal).toBeDefined();

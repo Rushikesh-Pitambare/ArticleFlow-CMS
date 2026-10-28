@@ -117,7 +117,17 @@ const [reviewingArticle, setReviewingArticle] = useState(false);
       const response = await userAPI.getAllUsers();
 
       if (response.data?.success) {
-        setUsers(response.data.users || []);
+        
+        const fetchedUsers = response.data.users || [];
+
+        setUsers(
+          fetchedUsers.map((u) => ({
+            ...u,
+            trustScore:
+            typeof u.trustScore === 'number' ? u.trustScore : null,
+          }))
+        );
+
       } else {
         setError('Failed to fetch users.');
       }
@@ -953,12 +963,21 @@ const [reviewingArticle, setReviewingArticle] = useState(false);
 
                     <td className="py-3.5">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <TrustBadge
-                          score={u.trustScore ?? 50}
-                          level={u.trustLevel}
-                          size="sm"
-                          variant="compact"
-                        />
+                        
+                      {typeof u.trustScore === 'number' ? (
+                      <TrustBadge
+                        score={u.trustScore}
+                        level={u.trustLevel}
+                        size="sm"
+                        variant="compact"
+                      />
+                      ) : (
+                        <span className="text-xs text-stone-500">
+                          Score unavailable
+                        </span>
+                      )}
+
+                        
                         {u.isRestricted && (
                           <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
                             Restricted
